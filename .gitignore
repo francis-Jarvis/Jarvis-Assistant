@@ -1,0 +1,12 @@
+# Archivos generados por Python
+__pycache__/
+*.pyc
+
+# Archivos generados por PyInstaller (si convertís a .exe)
+build/
+dist/
+*.spec
+
+# Entornos virtuales, por si usás alguno
+venv/
+env/
