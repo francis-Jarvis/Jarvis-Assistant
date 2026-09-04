@@ -1,0 +1,5 @@
+SpeechRecognition==3.10.4
+pyttsx3==2.90
+pyaudio==0.2.14
+pywin32==306
+psutil==5.9.8
