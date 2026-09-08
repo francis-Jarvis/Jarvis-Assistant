@@ -9,9 +9,12 @@ import datetime
 import os
 import threading
 import time
+import requests
 import win32gui
 import win32con
 import win32process
+import win32api
+from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
 
 # Mapeo de nombres comunes a comandos/ejecutables de Windows.
 # Sumá acá las apps que más uses.
@@ -152,6 +155,91 @@ def reproducir_populares(nombre_artista: str) -> str:
     )
 
 
+# Códigos de las teclas multimedia (funcionan con Spotify, YouTube,
+# o cualquier reproductor que esté activo, no solo Spotify).
+_VK_MEDIA_NEXT_TRACK = 0xB0
+_VK_MEDIA_PREV_TRACK = 0xB1
+_VK_MEDIA_PLAY_PAUSE = 0xB3
+
+
+def _presionar_tecla_multimedia(codigo: int):
+    win32api.keybd_event(codigo, 0, 0, 0)  # presionar
+    time.sleep(0.05)
+    win32api.keybd_event(codigo, 0, win32con.KEYEVENTF_KEYUP, 0)  # soltar
+
+
+def pausar_reanudar_musica() -> str:
+    try:
+        _presionar_tecla_multimedia(_VK_MEDIA_PLAY_PAUSE)
+        return "Listo."
+    except Exception as e:
+        return f"No pude pausar/reanudar la música: {e}"
+
+
+def siguiente_cancion() -> str:
+    try:
+        _presionar_tecla_multimedia(_VK_MEDIA_NEXT_TRACK)
+        return "Pasando a la siguiente canción."
+    except Exception as e:
+        return f"No pude pasar de canción: {e}"
+
+
+def cancion_anterior() -> str:
+    try:
+        _presionar_tecla_multimedia(_VK_MEDIA_PREV_TRACK)
+        return "Volviendo a la canción anterior."
+    except Exception as e:
+        return f"No pude volver de canción: {e}"
+
+
+def obtener_cancion_actual() -> str:
+    """
+    Lee qué se está reproduciendo en Spotify a partir del título de su
+    ventana (en Windows, Spotify muestra 'Artista - Canción' en el título
+    de su ventana mientras algo está sonando).
+    """
+    titulo_encontrado = []
+
+    def _revisar_ventana(hwnd, _):
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        try:
+            import psutil
+            proceso = psutil.Process(pid)
+            if proceso.name().lower() == "spotify.exe":
+                titulo = win32gui.GetWindowText(hwnd)
+                if titulo:
+                    titulo_encontrado.append(titulo)
+        except Exception:
+            pass
+
+    win32gui.EnumWindows(_revisar_ventana, None)
+
+    if not titulo_encontrado:
+        return "No encontré Spotify abierto en este momento."
+
+    # Spotify suele tener varias ventanas; nos quedamos con la más larga
+    # (la ventana principal con el título real, no una vacía tipo "Spotify")
+    titulo = max(titulo_encontrado, key=len).strip()
+    titulo_lower = titulo.lower()
+
+    # Casos especiales: nada sonando, o publicidad (cuenta gratis)
+    if titulo_lower in ("spotify", "spotify free", "spotify premium"):
+        return "Spotify está abierto, pero no parece estar reproduciendo nada ahora mismo."
+
+    if "advertisement" in titulo_lower or "publicidad" in titulo_lower:
+        return "Ahora mismo está sonando una publicidad en Spotify."
+
+    # El formato habitual es "Artista - Canción": lo separamos para que
+    # suene más natural al decirlo en voz alta, en vez de leerlo tal cual.
+    if " - " in titulo:
+        artista, cancion = titulo.split(" - ", 1)
+        return f"Está sonando {cancion.strip()}, de {artista.strip()}."
+
+    return f"Ahora está sonando: {titulo}."
+
+
 def abrir_me_gusta() -> str:
     """Abre 'Tus Me Gusta' (Liked Songs) de la cuenta de Spotify logueada."""
     try:
@@ -161,11 +249,96 @@ def abrir_me_gusta() -> str:
         return f"No pude abrir tu lista de Tus Me Gusta: {e}"
 
 
+_token_spotify = {"valor": None, "expira": 0}
+
+
+def _obtener_token_spotify() -> str | None:
+    """
+    Consigue (o reutiliza si todavía es válido) un token de acceso a la
+    API de Spotify usando las credenciales de la app (Client Credentials
+    Flow). Este tipo de token solo sirve para BUSCAR, no para controlar
+    la reproducción de tu cuenta directamente (para eso usamos los
+    protocolos spotify:track:... como ya veníamos haciendo).
+    """
+    ahora = time.time()
+    if _token_spotify["valor"] and ahora < _token_spotify["expira"]:
+        return _token_spotify["valor"]
+
+    if SPOTIFY_CLIENT_ID == "TU_CLIENT_ID_ACA":
+        return None  # todavía no configuraste las credenciales
+
+    try:
+        resp = requests.post(
+            "https://accounts.spotify.com/api/token",
+            data={"grant_type": "client_credentials"},
+            auth=(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET),
+            timeout=10,
+        )
+        resp.raise_for_status()
+        datos = resp.json()
+        _token_spotify["valor"] = datos["access_token"]
+        _token_spotify["expira"] = ahora + datos.get("expires_in", 3600) - 60
+        return _token_spotify["valor"]
+    except Exception:
+        return None
+
+
+def buscar_y_reproducir_cancion(consulta: str) -> str:
+    """
+    Busca cualquier canción por nombre (y opcionalmente artista) usando
+    la API de Spotify, y reproduce el primer resultado.
+    """
+    token = _obtener_token_spotify()
+    if not token:
+        return (
+            "No tengo configuradas las credenciales de la API de Spotify. "
+            "Agregalas en config.py para poder buscar cualquier canción."
+        )
+
+    try:
+        resp = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"q": consulta, "type": "track", "limit": 1},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        items = resp.json().get("tracks", {}).get("items", [])
+
+        if not items:
+            return f"No encontré ninguna canción llamada '{consulta}'."
+
+        track = items[0]
+        track_id = track["id"]
+        nombre_cancion = track["name"]
+        artistas = ", ".join(a["name"] for a in track["artists"])
+
+        os.startfile(f"spotify:track:{track_id}")
+        return f"Poniendo {nombre_cancion}, de {artistas}."
+    except Exception as e:
+        return f"Tuve un problema buscando esa canción: {e}"
+
+
 def poner_musica(nombre_artista: str) -> str:
     nombre = nombre_artista.lower().strip()
+
+    # Coincidencia flexible: si lo que pediste CONTIENE (o coincide
+    # exacto con) alguno de los artistas ya guardados, usamos ese —
+    # así "poné la mosca por favor" también encuentra a "la mosca".
     track_id = ARTISTAS_SPOTIFY.get(nombre)
+    artista_encontrado = nombre
     if not track_id:
-        return f"No tengo registrado el artista '{nombre_artista}'. Podés agregarlo en commands.py."
+        for clave in ARTISTAS_SPOTIFY:
+            if clave in nombre:
+                track_id = ARTISTAS_SPOTIFY[clave]
+                artista_encontrado = clave
+                break
+
+    if not track_id:
+        # No está en nuestra lista fija: buscamos dinámicamente por la API.
+        return buscar_y_reproducir_cancion(nombre_artista)
+
+    nombre_artista = artista_encontrado
     try:
         os.startfile(f"spotify:track:{track_id}")
         return (

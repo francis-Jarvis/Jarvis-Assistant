@@ -1,9 +1,53 @@
 """
-El "cerebro" de Jarvis: interpreta el texto reconocido por voz
-y lo matchea contra los comandos conocidos. 100% local, sin IA externa.
+El "cerebro" de Jarvis: interpreta el texto reconocido por voz y lo
+matchea contra los comandos conocidos. Si no matchea ninguno, se lo
+consulta a un modelo de IA gratis (Groq) para una respuesta conversacional.
 """
 import re
+import requests
 import commands
+from config import GROQ_API_KEY, GROQ_MODEL
+
+# Historial simple de la conversación (para que Jarvis tenga contexto
+# de lo último que hablaron, no cada vez arranca de cero)
+historial = []
+MAX_HISTORIAL = 10
+
+
+def consultar_ia(texto: str) -> str:
+    if GROQ_API_KEY == "TU_GROQ_API_KEY_ACA":
+        return "No entendí ese comando, y todavía no configuraste la API key de Groq para charlar de otras cosas."
+
+    historial.append({"role": "user", "content": texto})
+
+    try:
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            json={
+                "model": GROQ_MODEL,
+                "max_tokens": 200,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Sos Jarvis, un asistente de voz para Windows. "
+                            "Respondé siempre en español rioplatense, de forma breve "
+                            "y directa (1 a 3 oraciones), porque tu respuesta se va a "
+                            "leer en voz alta. No uses markdown, listas ni emojis."
+                        ),
+                    },
+                    *historial[-MAX_HISTORIAL:],
+                ],
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        texto_respuesta = resp.json()["choices"][0]["message"]["content"]
+        historial.append({"role": "assistant", "content": texto_respuesta})
+        return texto_respuesta
+    except Exception as e:
+        return f"Tuve un problema para conectarme con la IA: {e}"
 
 
 def procesar(texto: str) -> str:
@@ -20,6 +64,26 @@ def procesar(texto: str) -> str:
 
     if "qué día es" in texto_lower or "que dia es" in texto_lower or "qué fecha es" in texto_lower:
         return commands.decir_fecha()
+
+    if texto_lower in ("pausa", "pausá", "poné en pausa", "pausá la música", "pausá la canción"):
+        return commands.pausar_reanudar_musica()
+
+    if texto_lower in ("seguí", "segui", "reanudá", "reanuda", "dale play", "play"):
+        return commands.pausar_reanudar_musica()
+
+    if "próxima canción" in texto_lower or "proxima cancion" in texto_lower or \
+            "siguiente canción" in texto_lower or "siguiente cancion" in texto_lower or \
+            "siguiente tema" in texto_lower or "próximo tema" in texto_lower:
+        return commands.siguiente_cancion()
+
+    if "canción anterior" in texto_lower or "cancion anterior" in texto_lower or \
+            "tema anterior" in texto_lower or "anterior canción" in texto_lower:
+        return commands.cancion_anterior()
+
+    if "qué canción" in texto_lower or "que cancion" in texto_lower or \
+            "qué está sonando" in texto_lower or "que esta sonando" in texto_lower or \
+            "qué se está reproduciendo" in texto_lower or "que se esta reproduciendo" in texto_lower:
+        return commands.obtener_cancion_actual()
 
     if "tus me gusta" in texto_lower or "mis me gusta" in texto_lower or "canciones que me gustan" in texto_lower:
         return commands.abrir_me_gusta()
@@ -59,5 +123,5 @@ def procesar(texto: str) -> str:
     if texto_lower in ("salí", "sali", "chau", "adiós", "adios", "terminá", "termina"):
         return "__SALIR__"
 
-    # Ningún comando conocido matcheó
-    return "No entendí ese comando. Decime 'qué hora es', 'abrí' alguna app, o 'buscá algo en internet'."
+    # Ningún comando conocido matcheó: le preguntamos a la IA
+    return consultar_ia(texto)

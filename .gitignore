@@ -10,3 +10,6 @@ dist/
 # Entornos virtuales, por si usás alguno
 venv/
 env/
+
+# Archivo de configuración con API keys reales — NUNCA se sube a GitHub
+config.py
