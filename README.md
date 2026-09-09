@@ -1,8 +1,4 @@
-# Jarvis — Asistente de voz para Windows (v1, solo comandos locales)
-
-Versión 100% local y gratuita: escucha por micrófono y ejecuta comandos fijos.
-No usa ninguna IA externa, no necesita API key ni internet (salvo para el
-reconocimiento de voz de Google, que es gratis).
+#Jarvis: el nuevo programa "Asistente" para PC utiliza un avanzado modelo de IA  
 
 ## 1. Instalar las dependencias
 
@@ -73,4 +69,4 @@ función nueva en `commands.py`. Por ejemplo, para "subí el volumen":
 - **Error con PyAudio**: ver nota arriba, usar pipwin.
 - **La voz suena en inglés**: es porque Windows no tiene una voz en español
   instalada. Andá a Configuración > Hora e idioma > Voz, y agregá una voz en español.
-- ****problemas con el  antivirus de windows**:Algunas veces es detectado como troyano por windows  defender pero no equivale a un riesgo, debido a que solo "desenpaqueta" toda la información de la versión de consola
+-**problemas con el  antivirus de windows**:Algunas veces es detectado como troyano por windows  defender pero no equivale a un riesgo, debido a que solo "desenpaqueta" toda la información de la versión de consola
