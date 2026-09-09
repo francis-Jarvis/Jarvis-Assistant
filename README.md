@@ -73,4 +73,4 @@ función nueva en `commands.py`. Por ejemplo, para "subí el volumen":
 - **Error con PyAudio**: ver nota arriba, usar pipwin.
 - **La voz suena en inglés**: es porque Windows no tiene una voz en español
   instalada. Andá a Configuración > Hora e idioma > Voz, y agregá una voz en español.
-- **Algunas veces es detectado como troyano por windows  defender pero no equivale a un riesgo, debido a que solo "desenpaqueta" toda la información de la versión de consola
+- ****problemas con el  antivirus de windows**:Algunas veces es detectado como troyano por windows  defender pero no equivale a un riesgo, debido a que solo "desenpaqueta" toda la información de la versión de consola
