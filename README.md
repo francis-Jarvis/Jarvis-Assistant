@@ -1,4 +1,4 @@
-#Jarvis: el nuevo programa "Asistente" para PC utiliza un avanzado modelo de IA  
+#Jarvis: el nuevo asistente para PC incorpora inteligencia artificial avanzada para comprender y responder a las solicitudes del usuario.
 
 ## 1. Instalar las dependencias
 
