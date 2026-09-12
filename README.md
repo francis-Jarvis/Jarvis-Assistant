@@ -110,3 +110,22 @@ Windows, poné un acceso directo a ese `.exe` en la carpeta de inicio
 - `hud.py` — la ventana flotante animada
 - `config.py` — tus credenciales (no se sube a git)
 - `config.example.py` — plantilla de config sin credenciales
+
+## Problemas comunes
+
+- **No escucha nada / no reconoce**: revisá que Windows tenga permisos
+  de micrófono habilitados para apps de escritorio (Configuración >
+  Privacidad > Micrófono).
+- **Error con PyAudio**: si falla la instalación, probá `pip install
+  pipwin` y después `pipwin install pyaudio`.
+- **La voz suena en inglés**: Windows no tiene una voz en español
+  instalada. Andá a Configuración > Hora e idioma > Voz, y agregá una
+  voz en español.
+- **Antivirus marca el .exe como troyano**: ver la nota en la sección
+  de "Generar el .exe" más arriba — es un falso positivo conocido.
+
+## Ideas para más adelante
+
+- Wake word (decir "Jarvis" antes de cada comando) con algo tipo Porcupine
+- Reconocimiento de voz offline con Vosk, sin depender de internet
+- IA local y gratis con Ollama, corriendo en la propia PC
