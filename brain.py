@@ -26,7 +26,8 @@ def consultar_ia(texto: str) -> str:
             headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
             json={
                 "model": GROQ_MODEL,
-                "max_tokens": 200,
+                "max_tokens": 500,
+                "reasoning_effort": "low",
                 "messages": [
                     {
                         "role": "system",
@@ -99,6 +100,15 @@ def procesar(texto: str) -> str:
     match_musica = re.search(r"pon[eé] (?:música de |m[uú]sica de )?(.+)", texto_lower)
     if match_musica:
         return commands.poner_musica(match_musica.group(1))
+
+    if "qué clima" in texto_lower or "que clima" in texto_lower or \
+            "cómo está el clima" in texto_lower or "como esta el clima" in texto_lower or \
+            "va a llover" in texto_lower or "qué tiempo hace" in texto_lower or \
+            "que tiempo hace" in texto_lower or texto_lower.startswith("clima") or \
+            "poné el clima" in texto_lower or "pone el clima" in texto_lower:
+        match_ciudad = re.search(r"(?:clima|tiempo) (?:en|de) (.+)", texto_lower)
+        ciudad = match_ciudad.group(1) if match_ciudad else ""
+        return commands.obtener_clima(ciudad)
 
     match_abrir = re.search(r"abr[ií] (.+)", texto_lower)
     if match_abrir:

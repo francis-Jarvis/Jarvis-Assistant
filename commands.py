@@ -388,6 +388,98 @@ def buscar_en_internet(consulta: str) -> str:
     return f"Buscando '{consulta}' en internet."
 
 
+# Traducción de los "weather codes" que usa Open-Meteo (estándar WMO)
+# a una descripción corta en español.
+_CODIGOS_CLIMA = {
+    0: "cielo despejado",
+    1: "mayormente despejado",
+    2: "parcialmente nublado",
+    3: "nublado",
+    45: "con neblina",
+    48: "con neblina y escarcha",
+    51: "con llovizna leve",
+    53: "con llovizna moderada",
+    55: "con llovizna intensa",
+    61: "con lluvia leve",
+    63: "con lluvia moderada",
+    65: "con lluvia fuerte",
+    71: "con nevadas leves",
+    73: "con nevadas moderadas",
+    75: "con nevadas fuertes",
+    80: "con chaparrones leves",
+    81: "con chaparrones moderados",
+    82: "con chaparrones fuertes",
+    95: "con tormenta eléctrica",
+    96: "con tormenta eléctrica y granizo",
+    99: "con tormenta eléctrica y granizo fuerte",
+}
+
+
+def obtener_clima(ciudad: str = "") -> str:
+    """
+    Consulta el clima actual (y si va a llover en las próximas horas)
+    usando Open-Meteo, una API meteorológica gratuita y sin necesidad
+    de API key. Si no se especifica ciudad, usa San Juan, Argentina.
+    """
+    ciudad = ciudad.strip() or "San Juan, Argentina"
+
+    try:
+        # Paso 1: convertir el nombre de la ciudad en coordenadas
+        geo = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": ciudad, "count": 1, "language": "es"},
+            timeout=10,
+        )
+        geo.raise_for_status()
+        resultados = geo.json().get("results")
+        if not resultados:
+            return f"No encontré la ciudad '{ciudad}'."
+
+        lugar = resultados[0]
+        lat, lon = lugar["latitude"], lugar["longitude"]
+        nombre_lugar = lugar.get("name", ciudad)
+
+        # Paso 2: pedir el clima actual + probabilidad de lluvia próxima
+        clima = requests.get(
+            "https://api.open-meteo.com/v1/forecast",
+            params={
+                "latitude": lat,
+                "longitude": lon,
+                "current": "temperature_2m,apparent_temperature,weather_code",
+                "hourly": "precipitation_probability",
+                "forecast_days": 1,
+                "timezone": "auto",
+            },
+            timeout=10,
+        )
+        clima.raise_for_status()
+        datos = clima.json()
+
+        actual = datos["current"]
+        temperatura = round(actual["temperature_2m"])
+        sensacion = round(actual["apparent_temperature"])
+        descripcion = _CODIGOS_CLIMA.get(actual["weather_code"], "condiciones variables")
+
+        # Probabilidad de lluvia más alta en las próximas 6 horas
+        probs_lluvia = datos.get("hourly", {}).get("precipitation_probability", [])
+        prob_maxima = max(probs_lluvia[:6]) if probs_lluvia else None
+
+        respuesta = f"En {nombre_lugar} hay {temperatura} grados, {descripcion}"
+        if sensacion != temperatura:
+            respuesta += f", sensación térmica de {sensacion} grados"
+        respuesta += "."
+
+        if prob_maxima is not None:
+            if prob_maxima >= 50:
+                respuesta += f" Hay {prob_maxima}% de probabilidad de lluvia en las próximas horas, llevá paraguas."
+            elif prob_maxima >= 20:
+                respuesta += f" Hay una probabilidad baja de lluvia, {prob_maxima}%."
+
+        return respuesta
+    except Exception as e:
+        return f"No pude consultar el clima: {e}"
+
+
 def apagar_pc() -> str:
     # Comentado por seguridad. Descomentar si realmente lo querés habilitar.
     # os.system("shutdown /s /t 30")

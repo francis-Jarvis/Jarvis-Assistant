@@ -1,75 +1,112 @@
-# Jarvis — Asistente de voz para Windows (v1, solo comandos locales)
+# Jarvis - Asistente de voz para Windows
 
-Versión 100% local y gratuita: escucha por micrófono y ejecuta comandos fijos.
-No usa ninguna IA externa, no necesita API key ni internet (salvo para el
-reconocimiento de voz de Google, que es gratis).
+Asistente de voz personal en Python, con reconocimiento de voz en
+español (es-AR), control de aplicaciones y del sistema, Spotify,
+consulta del clima, un cerebro conversacional con IA (Groq, gratis),
+y un HUD visual en pantalla estilo "arc reactor".
 
-## 1. Instalar las dependencias
+## Requisitos
 
-Abrí una terminal en esta carpeta y corré:
+- Windows 10/11
+- Python 3.12+
+- Micrófono
+- Spotify instalado (para los comandos de música)
+
+## Instalación
 
 ```
 pip install -r requirements.txt
 ```
 
-**Nota sobre PyAudio:** a veces falla instalarse directo en Windows. Si te da error, probá:
+Copiá `config.example.py` como `config.py` y completá:
+- `GROQ_API_KEY`: gratis en [console.groq.com/keys](https://console.groq.com/keys)
+- `SPOTIFY_CLIENT_ID` y `SPOTIFY_CLIENT_SECRET`: gratis en
+  [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+  (creá una app, Redirect URI: `http://127.0.0.1:8888/callback`)
 
-```
-pip install pipwin
-pipwin install pyaudio
-```
+`config.py` nunca se sube a GitHub (está en `.gitignore`), así que tus
+keys quedan solo en tu compu.
 
-## 2. Ejecutar Jarvis
+## Uso
 
 ```
 python jarvis.py
 ```
 
-Te va a saludar por voz y va a quedar escuchando. Hablále con claridad.
+Al arrancar, Jarvis escucha todo lo que decís (sin necesidad de decir
+una palabra de activación) y va a aparecer un pequeño HUD circular en
+la esquina inferior derecha de la pantalla mientras te escucha
+(celeste) o mientras responde (naranja).
 
-## Comandos que entiende
+## Comandos disponibles
 
-- "**qué hora es**"
-- "**qué día es**"
-- "**abrí [app]**" → chrome, bloc de notas, calculadora, explorador, word, excel, spotify, vscode
-- "**cerrá [app]**"
-- "**buscá [algo] en internet**"
-- "**salí**" / "chau" → termina el programa
+**General**
+- "qué hora es"
+- "qué día es"
+- "salí" / "chau" (cierra Jarvis)
 
-Si decís algo que no matchea ningún comando, Jarvis te avisa que no lo entendió
-(no hay IA generativa de fondo, es todo reglas fijas).
+**Apps y ventanas**
+- "abrí [app]" — ver la lista de apps soportadas en `commands.py` (APPS)
+- "cerrá [app]"
+- "cerrá esta ventana" (cierra la ventana activa, como Alt+F4)
 
-## Cómo agregar más apps
+**Internet y juegos**
+- "buscá [algo] en internet"
+- "abrí [juego de Steam]" — Pizza Tower, Balatro (agregables en `commands.py`)
 
-Abrí `commands.py` y sumá entradas al diccionario `APPS`:
+**Clima**
+- "qué clima hace" (usa San Juan, Argentina por defecto)
+- "clima en [ciudad]" / "clima de [ciudad]"
+- "va a llover"
 
-```python
-APPS = {
-    ...
-    "mi_app": "nombre_del_ejecutable",
-}
+**Spotify**
+- "poné [artista o canción]" — busca automáticamente en Spotify
+  cualquier canción que no esté guardada de antemano
+- "poné el álbum [nombre]"
+- "poné las populares de [artista]"
+- "poné tus me gusta"
+- "qué canción está sonando"
+- "pausa" / "seguí"
+- "próxima canción" / "canción anterior"
+
+**Conversación libre**
+- Cualquier otra cosa que le digas se la consulta a un modelo de IA
+  gratis (Groq) y te responde de forma conversacional, con memoria de
+  los últimos mensajes de la charla.
+
+## Agregar más apps, artistas o juegos
+
+Todo está en `commands.py`, en diccionarios simples (`APPS`,
+`ARTISTAS_SPOTIFY`, `ALBUMES_SPOTIFY`, `JUEGOS_STEAM`,
+`POPULARES_POR_ARTISTA`). Sumar uno nuevo es agregar una línea al
+diccionario correspondiente; hay comentarios explicando cómo conseguir
+cada ID.
+
+## Generar el .exe (arranque automático)
+
+```
+pyinstaller --onefile --noconsole --name Jarvis jarvis.py
 ```
 
-## Cómo agregar más comandos
+El ejecutable queda en `dist/Jarvis.exe`. Para que arranque solo con
+Windows, poné un acceso directo a ese `.exe` en la carpeta de inicio
+(`Win + R` → `shell:startup`).
 
-Abrí `brain.py` y sumá un nuevo `if` dentro de `procesar()`, apuntando a una
-función nueva en `commands.py`. Por ejemplo, para "subí el volumen":
+> Nota: Windows Defender puede marcar el `.exe` como sospechoso
+> (`Trojan:Win32/Wacatac.B!ml`). Es un **falso positivo conocido** de
+> los ejecutables generados con PyInstaller `--onefile` (por cómo se
+> autoextraen en memoria al abrirse), no significa que el código tenga
+> nada malicioso — podés revisarlo vos mismo, es el mismo código de
+> este repo.
 
-1. En `commands.py`: crear función `subir_volumen()`.
-2. En `brain.py`: agregar `if "subí el volumen" in texto_lower: return commands.subir_volumen()`.
+## Estructura del proyecto
 
-## Próximos pasos (cuando esto funcione bien)
-
-- **Wake word** ("Jarvis, ...") con Porcupine, para no tener que apretar nada.
-- **Reconocimiento offline** con Vosk (no depende de internet para nada).
-- **IA local gratis** con Ollama (ej. Llama 3.2 chico) para respuestas más
-  flexibles, corriendo en tu propia PC sin pagar ninguna API.
-- **Interfaz visual** tipo HUD con PyQt o Tkinter.
-
-## Problemas comunes
-
-- **No escucha nada / no reconoce**: revisá que Windows tenga permisos de
-  micrófono habilitados para apps de escritorio (Configuración > Privacidad > Micrófono).
-- **Error con PyAudio**: ver nota arriba, usar pipwin.
-- **La voz suena en inglés**: es porque Windows no tiene una voz en español
-  instalada. Andá a Configuración > Hora e idioma > Voz, y agregá una voz en español.
+- `jarvis.py` — punto de entrada, arranca el HUD y el loop de voz
+- `voice.py` — reconocimiento de voz (Google STT) y síntesis (pyttsx3)
+- `brain.py` — interpreta el texto y decide qué comando ejecutar (o
+  consulta a Groq si no matchea ninguno)
+- `commands.py` — todas las acciones concretas (abrir apps, Spotify,
+  clima, etc.)
+- `hud.py` — la ventana flotante animada
+- `config.py` — tus credenciales (no se sube a git)
+- `config.example.py` — plantilla de config sin credenciales
